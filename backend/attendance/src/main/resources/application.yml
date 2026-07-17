@@ -1,0 +1,53 @@
+spring:
+  application:
+    name: attendance
+  datasource:
+    url: jdbc:postgresql://localhost:5432/attendance_db
+    username: attendance_user
+    password: attendance_pass
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+  # SMTP for GDPR consent emails. Credentials come from env vars on the systemd unit;
+  # locally they are unset so app.mail.enabled stays false and ConsentNotifier logs
+  # the link instead of sending (see ConsentNotifier). Default host/port target Gmail.
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+server:
+  port: 8080
+  # Behind the Caddy TLS reverse proxy (HTTPS terminated at Caddy, app stays on :8080).
+  # Honour X-Forwarded-Proto/Host/For so redirects use https://lab-attendance.duckdns.org
+  # and the session cookie is marked Secure.
+  forward-headers-strategy: framework
+
+# GDPR consent email. Sending is off unless app.mail.enabled=true AND a from-address
+# is set (both supplied via env on the VM). When off, ConsentNotifier logs the link.
+app:
+  mail:
+    enabled: ${MAIL_ENABLED:false}
+    from: ${MAIL_FROM:}
+
+# Attendance grace window: a scan at/before start+grace is PRESENT, after is LATE.
+attendance:
+  grace-minutes: 15
+  # Biometric retention (GDPR storage limitation): fingerprint templates are purged
+  # this many months after the student's enrolment (last group term) ended.
+  retention-months: 6

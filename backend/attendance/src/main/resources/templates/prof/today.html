@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Today's Sessions</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
+</head>
+<body>
+<div th:replace="~{fragments/nav :: navbar}"></div>
+<div class="container mt-4">
+    <div th:replace="~{fragments/alerts :: alerts}"></div>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">Today's Lab Sessions</h2>
+        <a th:href="@{/prof/attendance}" class="btn btn-outline-primary btn-sm">View all attendance (all days) →</a>
+    </div>
+
+    <form th:action="@{/prof}" method="get" class="row g-2 align-items-end mb-3">
+        <div class="col-auto">
+            <label class="form-label small mb-0">Course</label>
+            <select name="courseId" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option th:each="c : ${courses}" th:value="${c.id}"
+                        th:selected="${selectedCourseId != null and selectedCourseId == c.id}"
+                        th:text="${c.code + ' — ' + c.name}">CS101 — Course</option>
+            </select>
+        </div>
+    </form>
+
+    <table class="table table-bordered table-hover">
+        <thead class="table-dark">
+        <tr>
+            <th>Course</th>
+            <th>Group</th>
+            <th>Year</th>
+            <th>Room</th>
+            <th>Time</th>
+            <th>Status</th>
+            <th>Actions</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="s : ${sessions}">
+            <td>
+                <span class="fw-bold" th:text="${s.courseCode}">CS101</span>
+                <span class="text-muted small" th:text="${s.courseName}">Course</span>
+            </td>
+            <td th:text="${s.groupName}">Group</td>
+            <td th:text="${s.yearOfStudy != null ? s.yearOfStudy : '—'}">Year</td>
+            <td th:text="${s.roomName}">Room</td>
+            <td th:text="${#temporals.format(s.startAt, 'HH:mm')} + '–' + ${#temporals.format(s.endAt, 'HH:mm')}">10:00–12:00</td>
+            <td>
+                <span th:if="${s.status.name() == 'SCHEDULED'}" class="badge bg-success">SCHEDULED</span>
+                <span th:if="${s.status.name() == 'CANCELLED'}" class="badge bg-secondary">CANCELLED</span>
+                <span th:if="${s.status.name() == 'MOVED'}" class="badge bg-warning text-dark">MOVED</span>
+            </td>
+            <td>
+                <a th:href="@{/prof/sessions/{id}(id=${s.sessionId})}" class="btn btn-sm btn-primary">View attendance</a>
+                <form th:if="${s.status.name() == 'SCHEDULED'}"
+                      th:action="@{/prof/sessions/{id}/cancel(id=${s.sessionId})}" method="post" class="d-inline">
+                    <button class="btn btn-sm btn-outline-danger"
+                            onclick="return confirm('Cancel this session?')">Cancel</button>
+                </form>
+            </td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(sessions)}">
+            <td colspan="7" class="text-center text-muted">No lab sessions scheduled for today.</td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

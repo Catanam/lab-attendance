@@ -1,0 +1,22 @@
+# Java / Maven
+target/
+*.jar
+*.class
+
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Env & secrets
+.env
+*.env
+
+# OS
+Thumbs.db
+.DS_Store

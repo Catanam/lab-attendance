@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--
+  Client-side table search. Filters the rows of an already-rendered table by
+  matching the typed text against each row's visible text (any column). Nothing
+  is fetched from the server — the list is already loaded, this just hides the
+  non-matching rows, so there is no pagination/endpoint to maintain.
+
+  Usage (place directly above the table):
+    <div th:replace="~{fragments/search :: table('#studentsTable', 'Search students…')}"></div>
+  where the first arg is a CSS selector for the <table> and the second is the
+  input placeholder.
+-->
+<div th:fragment="table(target, placeholder)" class="mb-3">
+    <div class="input-group">
+        <span class="input-group-text" aria-hidden="true">🔍</span>
+        <input type="search" class="form-control js-table-search"
+               th:attr="data-target=${target}"
+               th:placeholder="${placeholder}" autocomplete="off">
+    </div>
+    <small class="text-muted js-search-count" th:attr="data-target=${target}"></small>
+
+    <script th:inline="none">
+    (function () {
+        function wire(input) {
+            if (input.hasAttribute('data-wired')) return;
+            input.setAttribute('data-wired', '1');
+            var sel   = input.getAttribute('data-target');
+            var table = document.querySelector(sel);
+            if (!table) return;
+            var tbody = table.tBodies[0] || table;
+            var countEl = document.querySelector('.js-search-count[data-target="' + sel + '"]');
+            var noMatchRow = null;
+
+            // Data rows only — skip any empty-state placeholder (a cell with colspan).
+            function dataRows() {
+                return Array.prototype.filter.call(tbody.rows, function (r) {
+                    return !r.querySelector('td[colspan]') && r !== noMatchRow;
+                });
+            }
+
+            function apply() {
+                var q = input.value.trim().toLowerCase();
+                var rows = dataRows();
+                var shown = 0;
+                rows.forEach(function (r) {
+                    var hit = !q || r.textContent.toLowerCase().indexOf(q) !== -1;
+                    r.style.display = hit ? '' : 'none';
+                    if (hit) {
+                        shown++;
+                    } else {
+                        // Don't let a filtered-out row stay selected (e.g. bulk-delete).
+                        var cb = r.querySelector('input[type="checkbox"]');
+                        if (cb && cb.checked) {
+                            cb.checked = false;
+                            cb.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    }
+                });
+
+                // Show a "no matches" line inside the table when a query hides everything.
+                if (q && rows.length && shown === 0) {
+                    if (!noMatchRow) {
+                        noMatchRow = tbody.insertRow();
+                        var td = noMatchRow.insertCell();
+                        td.colSpan = rows[0].cells.length || 1;
+                        td.className = 'text-center text-muted py-4';
+                        td.textContent = 'No matches.';
+                    }
+                    noMatchRow.style.display = '';
+                } else if (noMatchRow) {
+                    noMatchRow.style.display = 'none';
+                }
+
+                if (countEl) countEl.textContent =
+                    q ? (shown + ' of ' + rows.length + ' shown') : '';
+            }
+
+            input.addEventListener('input', apply);
+        }
+
+        function init() {
+            document.querySelectorAll('.js-table-search').forEach(wire);
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+        else init();
+    })();
+    </script>
+</div>
+
+<!--
+  Client-side searchable <select>. Renders a text box that filters the options
+  of a native <select> (hiding non-matching ones, keeping the placeholder), so a
+  long dropdown becomes type-to-find without replacing the control or its value.
+
+  Usage (place directly above the <select>):
+    <input ...><select id="studentPicker" ...>
+    <div th:replace="~{fragments/search :: select('#studentPicker', 'Type to find a student…')}"></div>
+-->
+<div th:fragment="select(target, placeholder)" class="mb-2">
+    <input type="search" class="form-control js-select-search"
+           th:attr="data-target=${target}"
+           th:placeholder="${placeholder}" autocomplete="off">
+
+    <script th:inline="none">
+    (function () {
+        function wire(input) {
+            if (input.hasAttribute('data-wired')) return;
+            input.setAttribute('data-wired', '1');
+            var sel = document.querySelector(input.getAttribute('data-target'));
+            if (!sel) return;
+            input.addEventListener('input', function () {
+                var q = input.value.trim().toLowerCase();
+                var matches = 0, firstMatch = null;
+                Array.prototype.forEach.call(sel.options, function (o) {
+                    if (!o.value) return;   // keep the "— select … —" placeholder visible
+                    var hit = !q || o.text.toLowerCase().indexOf(q) !== -1;
+                    o.hidden = !hit;
+                    if (hit) { matches++; if (!firstMatch) firstMatch = o; }
+                });
+                // When the filter narrows to a single option, pick it automatically.
+                if (q && matches === 1 && firstMatch) sel.value = firstMatch.value;
+            });
+        }
+        function init() {
+            document.querySelectorAll('.js-select-search').forEach(wire);
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+        else init();
+    })();
+    </script>
+</div>
+
+</body>
+</html>

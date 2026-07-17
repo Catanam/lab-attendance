@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Schedule — Lab Attendance</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div th:replace="~{fragments/nav :: navbar}"></div>
+<div class="container mt-4">
+    <h2>Scheduled Labs</h2>
+    <div th:replace="~{fragments/alerts :: alerts}"></div>
+
+    <!-- Term selector -->
+    <div class="d-flex align-items-center gap-3 mb-3">
+        <label class="fw-semibold mb-0">Term:</label>
+        <div th:each="t : ${terms}">
+            <a th:href="@{/scheduled-labs(termId=${t.id})}"
+               class="btn btn-sm"
+               th:classappend="${t.id == selectedTermId} ? 'btn-dark' : 'btn-outline-secondary'"
+               th:text="${t.name}"></a>
+        </div>
+        <span th:if="${#lists.isEmpty(terms)}" class="text-muted">No terms defined — add one first.</span>
+    </div>
+
+    <!-- Expand sessions button -->
+    <form th:if="${selectedTermId != null}" th:action="@{/scheduled-labs/expand}" method="post" class="mb-3">
+        <input type="hidden" name="termId" th:value="${selectedTermId}">
+        <button type="submit" class="btn btn-outline-success btn-sm"
+                onclick="return confirm('Expand all scheduled labs into individual sessions for this term? Skips already-expanded labs.')">
+            Expand Sessions for Term
+        </button>
+    </form>
+
+    <!-- Add lab form -->
+    <div class="card mb-4" th:if="${selectedTermId != null}">
+        <div class="card-header">Add Scheduled Lab</div>
+        <div class="card-body">
+            <form th:action="@{/scheduled-labs}" method="post" class="row g-2">
+                <input type="hidden" name="termId" th:value="${selectedTermId}">
+                <div class="col-md-3">
+                    <select name="courseId" class="form-select" required>
+                        <option value="">— Course —</option>
+                        <option th:each="c : ${courses}" th:value="${c.id}"
+                                th:text="${c.code + ' ' + c.name}"></option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select name="groupId" class="form-select" required>
+                        <option value="">— Group —</option>
+                        <option th:each="g : ${groups}" th:value="${g.id}" th:text="${g.name}"></option>
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <input type="number" name="yearOfStudy" class="form-control" required
+                           min="1" max="6" placeholder="Year" title="Year of study this lab serves">
+                </div>
+                <div class="col-md-2">
+                    <select name="roomId" class="form-select" required>
+                        <option value="">— Room —</option>
+                        <option th:each="r : ${rooms}" th:value="${r.id}" th:text="${r.name}"></option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select name="weekday" class="form-select" required>
+                        <option th:each="d : ${weekdays}" th:value="${d}" th:text="${d}"></option>
+                    </select>
+                </div>
+                <!-- Plain text + pattern instead of type="time": the native picker shows
+                     12-hour AM/PM on en-US OS locales (Chrome ignores lang). This forces a
+                     24-hour HH:mm field in every browser. Value still binds to LocalTime. -->
+                <div class="col-md-1">
+                    <input type="text" name="startTime" class="form-control" required
+                           pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="HH:mm"
+                           maxlength="5" inputmode="numeric" title="24-hour time, e.g. 15:00">
+                </div>
+                <div class="col-md-1">
+                    <input type="text" name="endTime" class="form-control" required
+                           pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="HH:mm"
+                           maxlength="5" inputmode="numeric" title="24-hour time, e.g. 15:00">
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">Add Lab</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lab grid -->
+    <div th:if="${selectedTermId != null}">
+        <div th:replace="~{fragments/search :: table('#labsTable', 'Search by day, course, group or room…')}"></div>
+    </div>
+    <table id="labsTable" class="table table-striped table-hover align-middle" th:if="${selectedTermId != null}">
+        <thead class="table-dark">
+            <tr><th>Day</th><th>Time</th><th>Course</th><th>Group</th><th>Year</th><th>Room</th><th></th></tr>
+        </thead>
+        <tbody>
+            <tr th:if="${#lists.isEmpty(labs)}">
+                <td colspan="7" class="text-center text-muted py-4">No labs scheduled for this term.</td>
+            </tr>
+            <tr th:each="lab : ${labs}">
+                <td th:text="${lab.weekday}"></td>
+                <td th:text="${#temporals.format(lab.startTime,'HH:mm') + '–' + #temporals.format(lab.endTime,'HH:mm')}"></td>
+                <td th:text="${lab.course.code + ' ' + lab.course.name}"></td>
+                <td th:text="${lab.group.name}"></td>
+                <td>
+                    <span th:if="${lab.yearOfStudy != null}" th:text="${lab.yearOfStudy}"></span>
+                    <span th:if="${lab.yearOfStudy == null}" class="badge bg-warning text-dark"
+                          title="No year set — this lab counts every year of the group. Delete and re-add it with a year.">⚠ all years</span>
+                </td>
+                <td th:text="${lab.room.name}"></td>
+                <td class="text-end">
+                    <form th:action="@{/scheduled-labs/{id}/delete(id=${lab.id})}" method="post" class="d-inline"
+                          onsubmit="return confirm('Delete this scheduled lab? This also deletes its generated sessions and any recorded attendance scans. This cannot be undone.')">
+                        <input type="hidden" name="termId" th:value="${selectedTermId}">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

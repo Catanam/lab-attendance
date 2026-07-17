@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Students — Lab Attendance</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div th:replace="~{fragments/nav :: navbar}"></div>
+
+<div class="container mt-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h2 class="m-0">Students</h2>
+        <a th:href="@{/import}" class="btn btn-outline-primary btn-sm">Bulk import (CSV / XLSX)</a>
+    </div>
+    <div th:replace="~{fragments/alerts :: alerts}"></div>
+
+    <!-- Add student form -->
+    <div class="card mb-4">
+        <div class="card-header">Add Student</div>
+        <div class="card-body">
+            <form th:action="@{/students}" method="post" class="row g-2">
+                <div class="col-md-2">
+                    <input type="text" name="matricolNumber" class="form-control" placeholder="Matricol" required>
+                </div>
+                <div class="col-md-3">
+                    <input type="text" name="fullName" class="form-control" placeholder="Full name" required>
+                </div>
+                <div class="col-md-2">
+                    <input type="email" name="email" class="form-control" placeholder="Email">
+                </div>
+                <div class="col-md-1">
+                    <input type="number" name="yearOfStudy" class="form-control" placeholder="Year" min="1" max="6">
+                </div>
+                <div class="col-md-2">
+                    <select name="primaryGroupId" class="form-select">
+                        <option value="">— No group —</option>
+                        <option th:each="g : ${groups}" th:value="${g.id}" th:text="${g.name}"></option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">Add</button>
+                </div>
+            </form>
+            <p class="text-muted small mt-2 mb-0">Group is optional — leave as “No group” and assign later from Edit or bulk import.</p>
+        </div>
+    </div>
+
+    <!-- Search + year/group filters + bulk actions toolbar -->
+    <div class="row g-2 align-items-end mb-1">
+        <div class="col-md-5">
+            <label for="studentSearch" class="form-label small mb-1">Search</label>
+            <div class="input-group">
+                <span class="input-group-text" aria-hidden="true">🔍</span>
+                <input type="search" id="studentSearch" class="form-control"
+                       placeholder="Search by name, matricol, email or group…" autocomplete="off">
+            </div>
+        </div>
+        <div class="col-md-2">
+            <label for="yearFilter" class="form-label small mb-1">Year</label>
+            <select id="yearFilter" class="form-select">
+                <option value="">All years</option>
+            </select>
+        </div>
+        <div class="col-md-5">
+            <label for="groupFilter" class="form-label small mb-1">Group</label>
+            <select id="groupFilter" class="form-select">
+                <option value="">All groups</option>
+            </select>
+        </div>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+        <span class="text-muted small me-1">Bulk actions:</span>
+        <button type="button" id="bulkDeactivateBtn" class="btn btn-warning btn-sm" disabled>Deactivate selected</button>
+        <button type="button" id="bulkResetFpBtn" class="btn btn-outline-danger btn-sm" disabled>Reset fingerprints</button>
+        <button type="button" id="bulkDeleteBtn" class="btn btn-danger btn-sm" disabled>Delete selected</button>
+    </div>
+    <small id="filterCount" class="text-muted"></small>
+
+    <!-- Student table -->
+    <table id="studentsTable" class="table table-striped table-hover align-middle">
+        <thead class="table-dark">
+            <tr>
+                <th style="width:1%"><input type="checkbox" id="selectAll" class="form-check-input" title="Select all"></th>
+                <th>Matricol</th>
+                <th>Full Name</th>
+                <th>Email</th>
+                <th>Year</th>
+                <th>Primary Group</th>
+                <th>Active</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:if="${#lists.isEmpty(students)}">
+                <td colspan="8" class="text-center text-muted py-4">No students yet.</td>
+            </tr>
+            <tr th:each="s : ${students}" th:classappend="${!s.active} ? 'table-secondary'"
+                th:attr="data-year=${s.yearOfStudy},data-group=${s.primaryGroup != null ? s.primaryGroup.name : ''}">
+                <td>
+                    <input type="checkbox" class="form-check-input row-check"
+                           th:value="${s.id}" th:attr="data-name=${s.matricolNumber}">
+                </td>
+                <td th:text="${s.matricolNumber}"></td>
+                <td th:text="${s.fullName}"></td>
+                <td th:text="${s.email}"></td>
+                <td th:text="${s.yearOfStudy}"></td>
+                <td th:text="${s.primaryGroup != null ? s.primaryGroup.name : '—'}"></td>
+                <td>
+                    <span th:if="${s.active}" class="badge bg-success">Active</span>
+                    <span th:unless="${s.active}" class="badge bg-secondary">Inactive</span>
+                </td>
+                <td class="text-end text-nowrap">
+                    <a th:href="@{/students/{id}/edit(id=${s.id})}" class="btn btn-sm btn-outline-primary">Edit</a>
+                    <form th:action="@{/students/{id}/toggle-active(id=${s.id})}" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-sm btn-outline-secondary"
+                                th:text="${s.active} ? 'Deactivate' : 'Activate'"></button>
+                    </form>
+                    <form th:action="@{/students/{id}/delete(id=${s.id})}" method="post" class="d-inline">
+                        <button type="button" class="btn btn-sm btn-outline-danger row-delete-btn"
+                                th:attr="data-name=${s.matricolNumber}">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <p class="text-muted small" th:text="'Total: ' + ${#lists.size(students)}"></p>
+</div>
+
+<!-- Hidden forms that carry the selected ids for each bulk action -->
+<form id="bulkDeleteForm" th:action="@{/students/bulk-delete}" method="post" class="d-none"></form>
+<form id="bulkDeactivateForm" th:action="@{/students/bulk-deactivate}" method="post" class="d-none"></form>
+<form id="bulkResetFpForm" th:action="@{/students/bulk-reset-fingerprint}" method="post" class="d-none"></form>
+
+<!-- Shared confirmation modal (page-styled, replaces window.confirm) -->
+<div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="confirmDeleteBody" class="mb-0">Delete this student?</p>
+                <div id="confirmTypeWrap" class="mt-3 d-none">
+                    <label for="confirmTypeInput" class="form-label small mb-1">
+                        Type <strong>confirm</strong> below to enable deletion:
+                    </label>
+                    <input type="text" id="confirmTypeInput" class="form-control"
+                           autocomplete="off" placeholder="confirm">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+(function () {
+    const modalEl   = document.getElementById('confirmDeleteModal');
+    const modal     = new bootstrap.Modal(modalEl);
+    const bodyEl    = document.getElementById('confirmDeleteBody');
+    const confirmEl = document.getElementById('confirmDeleteBtn');
+    const typeWrap  = document.getElementById('confirmTypeWrap');
+    const typeInput = document.getElementById('confirmTypeInput');
+    const bulkDeleteBtn     = document.getElementById('bulkDeleteBtn');
+    const bulkDeactivateBtn = document.getElementById('bulkDeactivateBtn');
+    const bulkResetFpBtn    = document.getElementById('bulkResetFpBtn');
+    const bulkDeleteForm     = document.getElementById('bulkDeleteForm');
+    const bulkDeactivateForm = document.getElementById('bulkDeactivateForm');
+    const bulkResetFpForm    = document.getElementById('bulkResetFpForm');
+    const selectAll = document.getElementById('selectAll');
+    let pending = null;
+    let requireType = false;
+
+    const checked = () => Array.from(document.querySelectorAll('.row-check:checked'));
+    const typedOk = () => typeInput.value.trim().toLowerCase() === 'confirm';
+
+    function setBulkBtn(btn, n, label) {
+        if (!btn) return;
+        btn.disabled = n === 0;
+        btn.textContent = n === 0 ? label : label + ' (' + n + ')';
+    }
+    function refreshBulkBtn() {
+        const n = checked().length;
+        setBulkBtn(bulkDeactivateBtn, n, 'Deactivate selected');
+        setBulkBtn(bulkResetFpBtn, n, 'Reset fingerprints');
+        setBulkBtn(bulkDeleteBtn, n, 'Delete selected');
+    }
+    // Copy the current selection into a hidden form's ids[] before submitting it.
+    function fillForm(form, sel) {
+        form.querySelectorAll('input[name="ids"]').forEach(i => i.remove());
+        sel.forEach(c => {
+            const inp = document.createElement('input');
+            inp.type = 'hidden'; inp.name = 'ids'; inp.value = c.value;
+            form.appendChild(inp);
+        });
+    }
+
+    // Open the shared confirm modal. When requireTyped is true the Delete button
+    // stays disabled until the operator types "confirm" by hand (bulk-delete guard).
+    function openConfirm(message, action, requireTyped) {
+        bodyEl.textContent = message;
+        pending = action;
+        requireType = !!requireTyped;
+        typeWrap.classList.toggle('d-none', !requireType);
+        typeInput.value = '';
+        confirmEl.disabled = requireType;
+        modal.show();
+        if (requireType) setTimeout(() => typeInput.focus(), 300);
+    }
+
+    typeInput.addEventListener('input', () => {
+        if (requireType) confirmEl.disabled = !typedOk();
+    });
+    typeInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && requireType && typedOk()) { e.preventDefault(); confirmEl.click(); }
+    });
+    modalEl.addEventListener('hidden.bs.modal', () => {
+        typeInput.value = '';
+        typeWrap.classList.add('d-none');
+        confirmEl.disabled = false;
+        requireType = false;
+        pending = null;
+    });
+
+    document.querySelectorAll('.row-check').forEach(c => c.addEventListener('change', refreshBulkBtn));
+    if (selectAll) {
+        selectAll.addEventListener('change', () => {
+            document.querySelectorAll('.row-check').forEach(c => {
+                const row = c.closest('tr');
+                if (row && row.style.display === 'none') return;   // skip filtered-out rows
+                c.checked = selectAll.checked;
+            });
+            refreshBulkBtn();
+        });
+    }
+
+    // Per-row delete (single — simple confirm, no typing).
+    document.querySelectorAll('.row-delete-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const form = btn.closest('form');
+            const name = btn.getAttribute('data-name') || 'this student';
+            openConfirm('Permanently delete ' + name +
+                '? This also removes their fingerprint data and scan history. This cannot be undone.',
+                () => form.submit(), false);
+        });
+    });
+
+    // Bulk deactivate (reversible — simple confirm, no typing).
+    if (bulkDeactivateBtn) {
+        bulkDeactivateBtn.addEventListener('click', () => {
+            const sel = checked();
+            if (sel.length === 0) return;
+            fillForm(bulkDeactivateForm, sel);
+            openConfirm('Deactivate ' + sel.length +
+                ' selected student(s)? They keep all history and can be reactivated later.',
+                () => bulkDeactivateForm.submit(), false);
+        });
+    }
+
+    // Bulk fingerprint reset (destructive — must type "confirm" by hand).
+    if (bulkResetFpBtn) {
+        bulkResetFpBtn.addEventListener('click', () => {
+            const sel = checked();
+            if (sel.length === 0) return;
+            fillForm(bulkResetFpForm, sel);
+            openConfirm('Remove fingerprint data for ' + sel.length +
+                ' selected student(s)? Their templates and biometric consent are erased ' +
+                '(scan-event audit kept); they can re-register after fresh consent. This cannot be undone.',
+                () => bulkResetFpForm.submit(), true);
+        });
+    }
+
+    // Bulk delete (destructive — must type "confirm" by hand).
+    if (bulkDeleteBtn) {
+        bulkDeleteBtn.addEventListener('click', () => {
+            const sel = checked();
+            if (sel.length === 0) return;
+            fillForm(bulkDeleteForm, sel);
+            openConfirm('Permanently delete ' + sel.length +
+                ' selected student(s)? This also removes their fingerprint data and scan history. This cannot be undone.',
+                () => bulkDeleteForm.submit(), true);
+        });
+    }
+
+    confirmEl.addEventListener('click', () => {
+        if (requireType && !typedOk()) return;
+        if (pending) pending();
+    });
+
+    // ---- Combined search + year + group filter ----------------------------------
+    // Group "1" recurs across years, so year and group are independent filters; a row
+    // shows only if it matches the text search AND the selected year AND the selected
+    // group. The dropdown options are derived from the rendered rows so they always
+    // match the data. Filtered-out rows are unchecked so a hidden row can't be bulk-
+    // deleted (mirrors the old shared search fragment's behaviour).
+    const searchInput = document.getElementById('studentSearch');
+    const yearFilter  = document.getElementById('yearFilter');
+    const groupFilter = document.getElementById('groupFilter');
+    const filterCount = document.getElementById('filterCount');
+    const dataRows = Array.prototype.filter.call(
+        document.querySelectorAll('#studentsTable tbody tr'),
+        r => !r.querySelector('td[colspan]'));
+
+    (function populateFilters() {
+        const years = new Set(), groups = new Set();
+        dataRows.forEach(r => {
+            const y = (r.getAttribute('data-year') || '').trim();
+            const g = (r.getAttribute('data-group') || '').trim();
+            if (y) years.add(y);
+            if (g) groups.add(g);
+        });
+        Array.from(years).sort((a, b) => a - b).forEach(y => yearFilter.add(new Option('Year ' + y, y)));
+        Array.from(groups).sort().forEach(g => groupFilter.add(new Option('Group ' + g, g)));
+    })();
+
+    function applyFilters() {
+        const q = searchInput.value.trim().toLowerCase();
+        const y = yearFilter.value, g = groupFilter.value;
+        let shown = 0;
+        dataRows.forEach(r => {
+            const hit = (!q || r.textContent.toLowerCase().indexOf(q) !== -1)
+                     && (!y || (r.getAttribute('data-year') || '') === y)
+                     && (!g || (r.getAttribute('data-group') || '') === g);
+            r.style.display = hit ? '' : 'none';
+            if (hit) {
+                shown++;
+            } else {
+                const cb = r.querySelector('.row-check');
+                if (cb && cb.checked) cb.checked = false;
+            }
+        });
+        if (selectAll) selectAll.checked = false;
+        refreshBulkBtn();
+        filterCount.textContent = (q || y || g) ? (shown + ' of ' + dataRows.length + ' shown') : '';
+    }
+
+    [searchInput, yearFilter, groupFilter].forEach(el => {
+        el.addEventListener('input', applyFilters);
+        el.addEventListener('change', applyFilters);
+    });
+})();
+</script>
+</body>
+</html>

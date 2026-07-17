@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<body>
+<nav th:fragment="navbar" class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" th:href="@{/}">Lab Attendance</a>
+        <button class="navbar-toggler" type="button"
+                data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item" sec:authorize="hasRole('SUPER_ADMIN')">
+                    <a class="nav-link" th:href="@{/students}">Students</a>
+                </li>
+                <li class="nav-item" sec:authorize="hasRole('SUPER_ADMIN')">
+                    <a class="nav-link" th:href="@{/professors}">Professors</a>
+                </li>
+                <li class="nav-item" sec:authorize="hasRole('SUPER_ADMIN')">
+                    <a class="nav-link" th:href="@{/courses}">Courses</a>
+                </li>
+                <li class="nav-item" sec:authorize="hasRole('SUPER_ADMIN')">
+                    <a class="nav-link" th:href="@{/groups}">Groups</a>
+                </li>
+                <li class="nav-item" sec:authorize="hasRole('SUPER_ADMIN')">
+                    <a class="nav-link" th:href="@{/rooms}">Rooms</a>
+                </li>
+                <li class="nav-item" sec:authorize="hasRole('SUPER_ADMIN')">
+                    <a class="nav-link" th:href="@{/terms}">Terms</a>
+                </li>
+                <li class="nav-item" sec:authorize="hasRole('SUPER_ADMIN')">
+                    <a class="nav-link" th:href="@{/scheduled-labs}">Schedule</a>
+                </li>
+                <li class="nav-item" sec:authorize="hasRole('SUPER_ADMIN')">
+                    <a class="nav-link" th:href="@{/devices}">Devices</a>
+                </li>
+                <li class="nav-item" sec:authorize="hasRole('SUPER_ADMIN')">
+                    <a class="nav-link" th:href="@{/accounts}">Accounts</a>
+                </li>
+                <li class="nav-item" sec:authorize="hasRole('SUPER_ADMIN')">
+                    <a class="nav-link" th:href="@{/register}">Register</a>
+                </li>
+                <li class="nav-item" sec:authorize="hasRole('SUPER_ADMIN')">
+                    <a class="nav-link" th:href="@{/gdpr}">GDPR</a>
+                </li>
+                <li class="nav-item" sec:authorize="hasRole('SUPER_ADMIN')">
+                    <a class="nav-link" th:href="@{/import}">Import</a>
+                </li>
+                <li class="nav-item" sec:authorize="hasAnyRole('SUPER_ADMIN','PROFESSOR')">
+                    <a class="nav-link" th:href="@{/prof}">Attendance</a>
+                </li>
+            </ul>
+            <div class="d-flex align-items-center gap-3">
+                <span class="navbar-text text-light" sec:authentication="name">User</span>
+                <form th:action="@{/logout}" method="post">
+                    <button type="submit" class="btn btn-outline-light btn-sm">Logout</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</nav>
+</body>
+</html>
